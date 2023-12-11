@@ -18,9 +18,6 @@ async function main() {
     const HogwartsNFT = await hre.ethers.getContractFactory("HogwartsNFT");
     const hogwartsNFT = await HogwartsNFT.deploy();
 
-   // let currentBlock = await hre.ethers.provider.getBlockNumber();
-   // while (currentBlock + 5 > (await hre.ethers.provider.getBlockNumber())) {}
-
     const hogwartsAddress = await hogwartsNFT.getAddress();
     console.log("Hogwarts NFT deployed to:", hogwartsAddress);
 
@@ -29,21 +26,19 @@ async function main() {
     const RandomHouse = await hre.ethers.getContractFactory("RandomHouseAssignment");
     const randomHouse = await RandomHouse.deploy(hogwartsAddress, vrfCoordinatorV2Address, subId, keyHash, callbackGasLimit);
 
-    //while (currentBlock + 5 > (await hre.ethers.provider.getBlockNumber())) {}
-
     const randomAddress = await randomHouse.getAddress();
     console.log("Random House Assignment deployed to:", randomAddress);
 
-    
     //Transfering ownership
     await hogwartsNFT.transferOwnership(randomAddress);
     console.log("Ownership transferred");
-
   }
-
-  main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+   
+ // We recommend this pattern to be able to use async/await everywhere
+// and properly handle errors.
+main()
+.then(() => process.exit(0))
+.catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
