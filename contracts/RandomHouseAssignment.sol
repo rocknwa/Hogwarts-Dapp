@@ -1,55 +1,39 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.8;
 
 import "./HogwartsNFT.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
-import "./VRFConsumerBaseV2.sol";
 
-contract RandomHouseAssignment is VRFConsumerBaseV2 {
+contract RandomHouseAssignment {
     HogwartsNFT public nftContract;
-    VRFCoordinatorV2Interface private i_vrfCoordinator;
-    uint64 private i_subscriptionId;
-    bytes32 private i_keyHash;
-    uint32 private i_callbackGasLimit;
-    mapping(uint256 => address) private s_requestIdToSender;
     mapping(address => string) private s_nameToSender;
+    mapping(address => bool) public hasRequested; // To prevent multiple requests from the same address
 
-    event NftRequested(uint256 indexed requestId, address requester);
+    event NftRequested(address requester);
+    event NftMinted(address minter, uint256 house);
 
-    constructor(
-        address _nftContract,
-        address vrfCoordinatorV2Address,
-        uint64 subId,
-        bytes32 keyHash,
-        uint32 callbackGasLimit
-    )
-        VRFConsumerBaseV2(vrfCoordinatorV2Address)
-    {
+    constructor(address _nftContract) {
         nftContract = HogwartsNFT(_nftContract);
-        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2Address);
-        i_subscriptionId = subId;
-        i_keyHash = keyHash;
-        i_callbackGasLimit = callbackGasLimit;
     }
 
     function requestNFT(string memory name) public {
-        uint256 requestId = i_vrfCoordinator.requestRandomWords(
-            i_keyHash,
-            i_subscriptionId,
-            3,
-            i_callbackGasLimit,
-            1
-        );
-
-        s_requestIdToSender[requestId] = msg.sender;
+        require(!hasRequested[msg.sender], "You have already requested an NFT");
+        
         s_nameToSender[msg.sender] = name;
-        emit NftRequested(requestId, msg.sender);
+        hasRequested[msg.sender] = true;
+        
+        // Generate random number
+        uint256 randomValue = _getRandomNumber(block.timestamp, msg.sender);
+        uint256 house = randomValue % 4; // Generates a value between 0 and 3
+        
+        // Mint the NFT
+        nftContract.mintNFT(msg.sender, house, name);
+
+        emit NftRequested(msg.sender);
+        emit NftMinted(msg.sender, house);
     }
 
-    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
-        address nftOwner = s_requestIdToSender[requestId];
-        string memory name = s_nameToSender[nftOwner];
-        uint256 house = randomWords[0] % 4;
-        nftContract.mintNFT(nftOwner, house, name);
+    // Custom randomness function
+    function _getRandomNumber(uint256 seed, address sender) internal view returns (uint256) {
+       return uint256(keccak256(abi.encodePacked(seed, block.timestamp, block.prevrandao, sender)));
     }
 }
